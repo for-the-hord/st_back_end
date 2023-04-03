@@ -18,7 +18,7 @@ from django.core.files.storage import default_storage
 
 import json, jwt
 
-from ST.models import User, Template
+from ST.models import User, Template,File
 from .tools import create_uuid, return_msg, create_return_json
 
 
@@ -123,8 +123,9 @@ class TemplateCreateView(CreateView):
             j = json.loads(request.body)
             name = j.get('name')
             formwork = j.get('formwork')
+            file_id =j.get('file_id')
             id = create_uuid()
-            template = self.model(name=name, template=formwork, id=id)
+            template = self.model(name=name, template=formwork, id=id,file_id=file_id)
             template.save()
             response_json['data'] = {'id': template.id, 'name': template.name, 'formwork': template.template}
         except Exception as e:
@@ -215,8 +216,13 @@ class UploadFileView(View):
         if file:
             filename = default_storage.save(file.name, file)
             id = create_uuid()
+            file = File(id=id,name=filename, path=file_path)
+            file.save()
             response_json['data'] = {'id': id, 'file_name': filename}
             return JsonResponse(response_json)
         else:
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.no_file
             return JsonResponse(response_json)
+
+
+
