@@ -14,6 +14,7 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.conf import settings
+from django.core.files.storage import default_storage
 
 import json, jwt
 
@@ -76,7 +77,7 @@ class TemplateListView(ListView):
             page_size = j.get('page_size')
             page_index = j.get('page_index')
             # 创建分页器
-            queryset = self.model.objects.all()
+            queryset = self.model.objects.all().order_by('id')
             paginator = Paginator(queryset, page_size)
 
             # 获取指定页的商品
@@ -115,7 +116,6 @@ class TemplateItem(DetailView):
 @method_decorator(csrf_exempt, name='dispatch')
 class TemplateCreateView(CreateView):
     model = Template
-    fields = ('id', 'name', 'template')
 
     def post(self, request: HttpRequest, *args, **kwargs):
         response_json = create_return_json()
@@ -205,3 +205,18 @@ class login(View):
             else:
                 response_json['msg'], response_json['code'] = '账户或密码错误！', return_msg.S100
         return JsonResponse(response_json)
+
+
+# 上传接口
+class UploadFileView(View):
+    def post(self, request, *args, **kwargs):
+        response_json = create_return_json()
+        file = request.FILES.get('file')
+        if file:
+            filename = default_storage.save(file.name, file)
+            id = create_uuid()
+            response_json['data'] = {'id': id, 'file_name': filename}
+            return JsonResponse(response_json)
+        else:
+            response_json['code'], response_json['msg'] = return_msg.S100, return_msg.no_file
+            return JsonResponse(response_json)

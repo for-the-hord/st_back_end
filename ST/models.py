@@ -8,12 +8,24 @@
 from django.db import models
 
 
+class File(models.Model):
+    id = models.TextField(primary_key=True)
+    name = models.TextField(blank=True, null=True)
+    path = models.TextField(blank=True, null=True)
+    create_date = models.DateField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'file'
+
+
 class Template(models.Model):
     id = models.TextField(primary_key=True)
     unit_id = models.TextField(blank=True, null=True)
     template = models.TextField(blank=True, null=True)
     user_id = models.TextField(blank=True, null=True)
     name = models.TextField(blank=True, null=True)
+    file_id = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False
@@ -42,10 +54,10 @@ class Unit(models.Model):
 
 class User(models.Model):
     id = models.TextField(primary_key=True)
-    account = models.TextField(blank=True,null=True)
     name = models.TextField(blank=True, null=True)
     password = models.TextField(blank=True, null=True)
     unit_id = models.TextField(blank=True, null=True)
+    account = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False

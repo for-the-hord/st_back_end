@@ -15,8 +15,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from .view import login, TemplateListView,TemplateCreateView, TemplateDeleteView, TemplateUpdateView,TemplateItem
-
+from .view import login, TemplateListView, TemplateCreateView, TemplateDeleteView, TemplateUpdateView, TemplateItem, \
+    UploadFileView
 
 urlpatterns = [
     path('api/admin/', admin.site.urls),
@@ -26,4 +26,5 @@ urlpatterns = [
     path('api/addFormwork', TemplateCreateView.as_view()),
     path('api/delFormwork', TemplateDeleteView.as_view()),
     path('api/putFormworkItem', TemplateUpdateView.as_view()),
+    path('api/file/upload', UploadFileView.as_view()),
 ]
