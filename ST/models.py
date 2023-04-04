@@ -23,9 +23,11 @@ class Template(models.Model):
     id = models.TextField(primary_key=True)
     unit_id = models.TextField(blank=True, null=True)
     template = models.TextField(blank=True, null=True)
-    user_id = models.TextField(blank=True, null=True)
+    #user_id = models.TextField(blank=True, null=True)
+    user = models.ForeignKey(to='User',to_field='id',on_delete=models.DO_NOTHING,null=True)
     name = models.TextField(blank=True, null=True)
-    file_id = models.TextField(blank=True, null=True)
+    #file_id = models.TextField(blank=True, null=True)
+    file =models.ForeignKey(to='File',to_field='id',null=True,on_delete=models.DO_NOTHING)
 
     class Meta:
         managed = False

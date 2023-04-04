@@ -64,7 +64,7 @@ def check_token(view_func):
 
 # 获取所有模板列表接口
 @method_decorator(csrf_exempt, name='dispatch')
-@method_decorator(check_token, name='dispatch')
+# @method_decorator(check_token, name='dispatch')
 class TemplateListView(ListView):
     model = Template
 
@@ -77,12 +77,13 @@ class TemplateListView(ListView):
             page_size = j.get('page_size')
             page_index = j.get('page_index')
             # 创建分页器
-            queryset = self.model.objects.all().order_by('id')
+            queryset = Template.objects.all().values('id', 'name', 'template', 'user__name').order_by('id')
             paginator = Paginator(queryset, page_size)
 
             # 获取指定页的商品
             page = paginator.get_page(page_index)
-            template_list = [{'id': it.id, 'name': it.name, 'formwork': it.template} for it in
+            template_list = [{'id': it.get('id'), 'name': it.get('name'), 'formwork': it.get('template'),
+                              'user_name': it.get('user__name')} for it in
                              page] if page is not None else None
 
             # 构造返回数据
