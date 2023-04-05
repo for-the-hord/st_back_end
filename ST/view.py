@@ -318,9 +318,7 @@ class DataListView(ListView):
 # 获取单个数据信息
 @method_decorator(csrf_exempt, name='dispatch')
 class DataItem(DetailView):
-    model = Template
-
-    def post(self, request, *args, **kwargs):
+     def post(self, request, *args, **kwargs):
         response_json = create_return_json()
         try:
             j = json.loads(request.body)
@@ -359,7 +357,6 @@ class DataItem(DetailView):
 # 添加一个数据列表接口
 @method_decorator(csrf_exempt, name='dispatch')
 class DataCreateView(CreateView):
-    model = Template
 
     def post(self, request: HttpRequest, *args, **kwargs):
         response_json = create_return_json()
@@ -384,7 +381,6 @@ class DataCreateView(CreateView):
 # 修改一个数据信息接口
 @method_decorator(csrf_exempt, name='dispatch')
 class DataUpdateView(UpdateView):
-    model = Template
 
     def post(self, request, *args, **kwargs):
         response_json = create_return_json()
@@ -408,7 +404,6 @@ class DataUpdateView(UpdateView):
 # 删除一个或者多个数据信息接口
 @method_decorator(csrf_exempt, name='dispatch')
 class DataDeleteView(DeleteView):
-    model = Template
 
     def post(self, request, *args, **kwargs):
         response_json = create_return_json()
@@ -428,7 +423,6 @@ class DataDeleteView(DeleteView):
 # 搜索数据信息接口
 @method_decorator(csrf_exempt, name='dispatch')
 class DataSearchView(DeleteView):
-    model = Template
 
     def post(self, request, *args, **kwargs):
         response_json = create_return_json()
