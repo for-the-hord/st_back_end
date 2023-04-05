@@ -66,3 +66,14 @@ def create_return_json():
         'msg': return_msg.succ,
         'data': None
     }
+def rows_as_dict(cursor):
+    """
+    查询结果集转字典
+    Args:
+        cursor:
+
+    Returns:
+
+    """
+    col_names = [i[0].lower() for i in cursor.description]
+    return [dict(zip(col_names, row)) for row in cursor]
