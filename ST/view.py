@@ -239,16 +239,18 @@ class login(View):
                 sql = 'select u.id,n.id as unit_id,n.name as unit_name,u.name  ' \
                       'from user u left join unit n on u.unit_id=n.id ' \
                       'where u.account= %s and u.password=%s'
-                params = [account,password]
+                params = [account, password]
                 cur.execute(sql, params)
                 rows = rows_as_dict(cur)
             if len(rows) is not 0:
                 user = rows[0]
                 payload = {'user_id': user.get('id')}
                 token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
-                response_json['msg'], response_json['data'] = '登陆成功！', {'token_id': token, 'user_name': user.get('name'),
-                                                                        'user_id': user.get('id'),'unit_id':user.get('unit_id'),
-                                                                        'unit_name':user.get('unit_name')}
+                response_json['msg'], response_json['data'] = '登陆成功！', {'token_id': token,
+                                                                        'user_name': user.get('name'),
+                                                                        'user_id': user.get('id'),
+                                                                        'unit_id': user.get('unit_id'),
+                                                                        'unit_name': user.get('unit_name')}
             else:
                 response_json['msg'], response_json['code'] = '账户或密码错误！', return_msg.S100
         return JsonResponse(response_json)
@@ -270,30 +272,39 @@ class UploadFileView(View):
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.no_file
             return JsonResponse(response_json)
 
+
 # 获取所有数据列表接口
 @method_decorator(csrf_exempt, name='dispatch')
 # @method_decorator(check_token, name='dispatch')
 class DataListView(ListView):
-      def post(self, request: HttpRequest, *args, **kwargs):
-
+    def post(self, request: HttpRequest, *args, **kwargs):
         response_json = create_return_json()
         try:
             j = json.loads(request.body)
             page_size = j.get('page_size')
             page_index = j.get('page_index')
             with connection.cursor() as cur:
-                sql = 'select count(*) as count from template'
+                sql = 'select count(*) as count from tp_data'
                 cur.execute(sql)
                 rows = rows_as_dict(cur)
                 count = rows[0]['count']
-                sql = 'select d.id,d.name , t.name as template_name,t.template,t.is_file,u.name as user_name ' \
-                      'from tp_data d left join template t left join user u on u.id=t.user_id order by t.id limit %s offset %s'
+                sql = 'select d.id,d.name,' \
+                      't.name as template_name,t.template,t.is_file,' \
+                      'u.name as user_name,' \
+                      'n.name as unit_name ' \
+                      'from tp_data d ' \
+                      'left join template t on t.id=d.template_id ' \
+                      'left join user u on u.id=d.user_id ' \
+                      'left join unit n on n.id=d.unit_id ' \
+                      'order by t.id ' \
+                      'limit %s offset %s'
                 params = [page_size, page_index - 1]
                 cur.execute(sql, params)
                 rows = rows_as_dict(cur)
-                data_list = [{'id': it.get('id'), 'name': it.get('name'), 'formwork': it.get('template'),
-                                  'user_name': it.get('user_name'), 'is_file': it.get('is_fle')} for it in
-                                 rows] if len(rows) is not 0 else None
+                data_list = [{'id': it.get('id'), 'name': it.get('name'), 'formwork_name': it.get('template_name'),
+                              'user_name': it.get('user_name'), 'is_file': it.get('is_fle'),
+                              'unit_name': it.get('unit_name')} for it in
+                             rows] if len(rows) is not 0 else None
 
                 # 构造返回数据
                 response_json['data'] = {'records': data_list, 'title': None,
@@ -314,8 +325,15 @@ class DataItem(DetailView):
         try:
             j = json.loads(request.body)
             with connection.cursor() as cur:
-                sql = 'select d.id,d.name,d.data,d.files,t.is_file,t.name as template_name ' \
-                      'from tp_data d left join template t on d.tp_id=t.id where d.id=%s'
+                sql = 'select d.id,d.name,d.data,d.files,d.create_date,d.update_date,' \
+                      't.is_file,t.name as template_name,' \
+                      'n.name as unit_name,' \
+                      'u.name as user_name ' \
+                      'from tp_data d ' \
+                      'left join template t on d.template_id=t.id ' \
+                      'left join unit n on n.id=d.unit_id ' \
+                      'left join user u on u.id=d.user_id ' \
+                      'where d.id=%s'
                 params = [j.get('id')]
                 cur.execute(sql, params)
                 rows = rows_as_dict(cur)
@@ -326,8 +344,13 @@ class DataItem(DetailView):
                     response_json['data'] = {'id': rows[0].get('id'), 'name': rows[0].get('name'),
                                              'formwork_name': rows[0].get('template_name'),
                                              'is_file': rows[0].get('is_file'),
-                                             'data_info':rows[0].get('data'),
-                                             'files': json.loads(rows[0].get('files'))}
+                                             'data_info': rows[0].get('data'),
+                                             'files': json.loads(rows[0].get('files')),
+                                             'unit_name':rows[0].get('unit_name'),
+                                             'user_name':rows[0].get('user_name'),
+                                             'create_date':rows[0].get('create_date'),
+                                             'update_date':rows[0].get('update_date')
+                                             }
         except Exception as e:
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.row_none
         return JsonResponse(response_json)
@@ -349,7 +372,7 @@ class DataCreateView(CreateView):
             id = create_uuid()
             with connection.cursor() as cur:
                 sql = 'insert into tp_data (id,name,tp_id,data,files) values(%s,%s,%s,%s,%s)'
-                params = [id, name, formwork_id,json.dumps(data_info), json.dumps(files)]
+                params = [id, name, formwork_id, json.dumps(data_info), json.dumps(files)]
                 cur.execute(sql, params)
                 connection.commit()
             response_json['data'] = {'id': id, 'name': name, 'data_info': data_info, 'files': files}
@@ -393,7 +416,7 @@ class DataDeleteView(DeleteView):
             j = json.loads(request.body)
             ids = j.get('ids')
             with connection.cursor() as cur:
-                sql = 'delete from template  where id=%s'
+                sql = 'delete from tp_data  where id=%s'
                 params = [[it] for it in ids]
                 cur.executemany(sql, params)
                 connection.commit()
@@ -413,9 +436,15 @@ class DataSearchView(DeleteView):
             j = json.loads(request.body)
             name = j.get('name')
             with connection.cursor() as cur:
-                sql = 'select t.id,t.name,t.template,t.is_file,u.name as user_name ' \
-                      'from template t left join user u on u.id=t.user_id ' \
-                      'where t.name like %s'
+                sql = 'select d.id,d.name,' \
+                      't.name as template_name,t.template,t.is_file,' \
+                      'u.name as user_name,' \
+                      'n.name as unit_name ' \
+                      'from tp_data d ' \
+                      'left join template t on t.id=d.template_id ' \
+                      'left join user u on u.id=d.user_id ' \
+                      'left join unit n on n.id=d.unit_id ' \
+                      'where d.name like %s'
                 params = [f'%{name}%']
                 cur.execute(sql, params)
                 rows = rows_as_dict(cur)
@@ -423,12 +452,13 @@ class DataSearchView(DeleteView):
                 if len(rows) is 0:
                     response_json['code'], response_json['msg'] = return_msg.S100, return_msg.row_none
                 else:
-                    template_list = [{'id': it.get('id'), 'name': it.get('name'), 'formwork': it.get('template'),
-                                      'user_name': it.get('user_name'), 'is_file': it.get('is_fle')} for it in
-                                     rows] if len(rows) is not 0 else None
+                    data_list = [{'id': it.get('id'), 'name': it.get('name'), 'formwork_name': it.get('template_name'),
+                                  'user_name': it.get('user_name'), 'is_file': it.get('is_fle'),
+                                  'unit_name': it.get('unit_name')} for it in
+                                 rows] if len(rows) is not 0 else None
 
                     # 构造返回数据
-                    response_json['data'] = template_list
+                    response_json['data'] = data_list
         except Exception as e:
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.row_none
         return JsonResponse(response_json)
