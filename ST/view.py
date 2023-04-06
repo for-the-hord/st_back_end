@@ -6,18 +6,18 @@
 @time: 2023/3/30 11:30
 @description: 
 """
-from django.db import connection
-from django.views import View
-from django.core.paginator import Paginator
-from django.http import JsonResponse, HttpRequest
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
-from django.shortcuts import get_object_or_404
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
+import json
+import jwt
+from collections import defaultdict
+
 from django.conf import settings
 from django.core.files.storage import default_storage
-
-import json, jwt
+from django.db import connection
+from django.http import JsonResponse, HttpRequest
+from django.utils.decorators import method_decorator
+from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
 
 from ST.models import User, Template, File
 from .tools import create_uuid, return_msg, create_return_json, rows_as_dict
@@ -107,7 +107,8 @@ class TemplateListView(ListView):
                     count = rows[0]['count']
                     sql = 'select t.id,t.name as formwork_name,t.template,t.is_file,t.equipment_name,' \
                           'u.name as user_name ' \
-                          f'from template t left join user u on u.id=t.user_id where {where_clause} ' \
+                          'from template t left join user u on u.id=t.user_id ' \
+                          f'where {where_clause} ' \
                           'order by t.id limit %s offset %s'
                     params = where_values + [page_size, (page_index - 1) * page_size]
                     cur.execute(sql, params)
@@ -169,14 +170,15 @@ class TemplateCreateView(CreateView):
             name = j.get('name')
             formwork = j.get('formwork')
             is_file = j.get('is_file')
-            equipment_name= j.get('equipment_name')
+            equipment_name = j.get('equipment_name')
             id = create_uuid()
             with connection.cursor() as cur:
                 sql = 'insert into template (id,name,template,is_file,equipment_name) values(%s,%s,%s,%s,%s)'
                 params = [id, name, json.dumps(formwork), is_file, equipment_name]
                 cur.execute(sql, params)
                 connection.commit()
-            response_json['data'] = {'id': id, 'name': name, 'formwork': formwork, 'is_file': is_file,'equipment_name':equipment_name}
+            response_json['data'] = {'id': id, 'name': name, 'formwork': formwork, 'is_file': is_file,
+                                     'equipment_name': equipment_name}
         except Exception as e:
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_insert
         return JsonResponse(response_json)
@@ -487,4 +489,193 @@ class DataSearchView(DeleteView):
                     response_json['data'] = data_list
         except Exception as e:
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.row_none
+        return JsonResponse(response_json)
+
+
+# 获取所有数据列表接口
+@method_decorator(csrf_exempt, name='dispatch')
+# @method_decorator(check_token, name='dispatch')
+class UnitListView(ListView):
+    def post(self, request: HttpRequest, *args, **kwargs):
+        response_json = create_return_json()
+        try:
+            j = json.loads(request.body)
+            page_size = j.get('page_size')
+            page_index = j.get('page_index')
+            condition = j.get('condition')
+            if len(condition) == 0:
+                with connection.cursor() as cur:
+                    sql = 'select count(*) as count from unit'
+                    cur.execute(sql)
+                    rows = rows_as_dict(cur)
+                    count = rows[0]['count']
+                    sql = 'select n.id, n.name,' \
+                          't.id as template_id,t.name as template_name ' \
+                          'from unit n ' \
+                          'left join unit_template ut on n.id=ut.unit_id ' \
+                          'left join template t on ut.template_id=t.id ' \
+                          'order by n.id ' \
+                          'limit %s offset %s'
+                    params = [page_size, (page_index - 1) * page_size]
+                    cur.execute(sql, params)
+                    rows = rows_as_dict(cur)
+                    data_list = [{'id': it.get('id'), 'name': it.get('name'),
+                                  'formwork_id': it.get('template_id'), 'formwork_name': it.get('template_name')
+                                  } for it in
+                                 rows] if len(rows) != 0 else None
+
+            else:
+                where_clause = " AND ".join([f"{key} LIKE %s" for key in condition.keys()])
+                where_values = ["%" + value + "%" for value in condition.values()]
+                with connection.cursor() as cur:
+                    params = where_values
+                    sql = f'select count(*) as count,n.name as unit_name from unit n WHERE {where_clause}'
+                    cur.execute(sql, params)
+                    rows = rows_as_dict(cur)
+                    count = rows[0]['count']
+                    sql = 'select n.id, n.name,' \
+                          't.id as template_id,t.name as template_name ' \
+                          'from unit n ' \
+                          'left join unit_template ut on n.id=ut.unit_id ' \
+                          'left join template t on ut.template_id=t.id  ' \
+                          f'where {where_clause} ' \
+                          'order by t.id limit %s offset %s'
+                    params = where_values + [page_size, (page_index - 1) * page_size]
+                    cur.execute(sql, params)
+                    rows = rows_as_dict(cur)
+                    data_list = [
+                        {'id': it.get('id'), 'name': it.get('name'),
+                         'formwork_id': it.get('template_id'), 'formwork_name': it.get('template_name')
+                         } for it in
+                        rows] if len(rows) != 0 else None
+
+            # 使用 defaultdict 创建新的数据结构
+            records = defaultdict(lambda: {"id": None, "name": None, "formwork_list": []})
+            for record in data_list:
+                # 按照 id 分组，每个分组都是一个字典
+                group = records[record["id"]]
+                group["id"] = record["id"]
+                group["name"] = record["name"]
+                # 如果 formwork_id 和 formwork_name 不为 None，则加入到 formwork_list 中
+                if record["formwork_id"] is not None and record["formwork_name"] is not None:
+                    group["formwork_list"].append(
+                        {"formwork_id": record["formwork_id"], "formwork_name": record["formwork_name"]})
+
+            # 将字典转换为列表
+            records = list(records.values())
+            # 构造返回数据
+            response_json['data'] = {'records': records, 'title': None,
+                                     'total': count}
+        except Exception as e:
+            response_json['code'], response_json['msg'] = return_msg.S100, return_msg.params_error
+
+        return JsonResponse(response_json)
+
+
+# 获取单个数据信息
+@method_decorator(csrf_exempt, name='dispatch')
+class UnitItem(DetailView):
+    def post(self, request, *args, **kwargs):
+        response_json = create_return_json()
+        try:
+            j = json.loads(request.body)
+            with connection.cursor() as cur:
+                sql = 'select d.id,d.name,d.data,d.files,d.create_date,d.update_date,' \
+                      't.is_file,t.name as template_name,' \
+                      'n.name as unit_name,' \
+                      'u.name as user_name ' \
+                      'from tp_data d ' \
+                      'left join template t on d.template_id=t.id ' \
+                      'left join unit n on n.id=d.unit_id ' \
+                      'left join user u on u.id=d.user_id ' \
+                      'where d.id=%s'
+                params = [j.get('id')]
+                cur.execute(sql, params)
+                rows = rows_as_dict(cur)
+                # 构造返回数据
+                if len(rows) == 0:
+                    response_json['code'], response_json['msg'] = return_msg.S100, return_msg.row_none
+                else:
+                    response_json['data'] = {'id': rows[0].get('id'), 'name': rows[0].get('name'),
+                                             'formwork_name': rows[0].get('template_name'),
+                                             'is_file': rows[0].get('is_file'),
+                                             'data_info': rows[0].get('data'),
+                                             'files': json.loads(rows[0].get('files')),
+                                             'unit_name': rows[0].get('unit_name'),
+                                             'user_name': rows[0].get('user_name'),
+                                             'create_date': rows[0].get('create_date'),
+                                             'update_date': rows[0].get('update_date')
+                                             }
+        except Exception as e:
+            response_json['code'], response_json['msg'] = return_msg.S100, return_msg.row_none
+        return JsonResponse(response_json)
+
+
+# 添加一个单位接口
+@method_decorator(csrf_exempt, name='dispatch')
+class UnitCreateView(CreateView):
+
+    def post(self, request: HttpRequest, *args, **kwargs):
+        response_json = create_return_json()
+        try:
+            j = json.loads(request.body)
+            name = j.get('name')
+            id = create_uuid()
+            with connection.cursor() as cur:
+                sql = 'insert into unit (id,name) values(%s,%s)'
+                params = [id, name]
+                cur.execute(sql, params)
+                connection.commit()
+                response_json['data'] = {'id': id}
+        except Exception as e:
+            response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_insert
+        return JsonResponse(response_json)
+
+
+# 修改一个数据信息接口
+@method_decorator(csrf_exempt, name='dispatch')
+class UnitUpdateView(UpdateView):
+
+    def post(self, request, *args, **kwargs):
+        response_json = create_return_json()
+        try:
+            j = json.loads(request.body)
+            name = j.get('name')
+            id = j.get('id')
+            template_ids = j.get('template_ids')
+            with connection.cursor() as cur:
+                sql = 'update unit set name=%s where id=%s'
+                params = [name, id]
+                cur.execute(sql, params)
+                sql = 'delete from unit_template  where unit_id=%s'
+                params = [id]
+                cur.execute(sql, params)
+                sql = 'insert into unit_template (unit_id,template_id) values (%s,%s)'
+                params = [[id, it] for it in template_ids]
+                cur.executemany(sql, params)
+                connection.commit()
+
+        except Exception as e:
+            response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_update
+        return JsonResponse(response_json)
+
+
+# 删除一个或者多个数据信息接口
+@method_decorator(csrf_exempt, name='dispatch')
+class UnitDeleteView(DeleteView):
+
+    def post(self, request, *args, **kwargs):
+        response_json = create_return_json()
+        try:
+            j = json.loads(request.body)
+            ids = j.get('ids')
+            with connection.cursor() as cur:
+                sql = 'delete from unit  where id=%s'
+                params = [[it] for it in ids]
+                cur.executemany(sql, params)
+                sql = 'delete from unit_template  where unit_id=%s'
+                cur.executemany(sql, params)
+                connection.commit()
+        except self.model.DoesNotExist:
+            response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_delete
         return JsonResponse(response_json)

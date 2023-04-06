@@ -17,7 +17,7 @@ from django.contrib import admin
 from django.urls import path
 from .view import login, UploadFileView, TemplateListView, TemplateCreateView, TemplateDeleteView, TemplateUpdateView, \
     TemplateItem, TemplateSearchView, DataListView, DataCreateView, DataUpdateView, DataDeleteView, DataItem, \
-    DataSearchView
+    DataSearchView, UnitListView, UnitItem, UnitCreateView, UnitUpdateView, UnitDeleteView
 
 urlpatterns = [
     path('api/admin/', admin.site.urls),
@@ -35,4 +35,9 @@ urlpatterns = [
     path('api/putDataInfoItem', DataUpdateView.as_view()),
     path('api/searchDataInfoItem', DataSearchView.as_view()),
     path('api/file/upload', UploadFileView.as_view()),
+    path('api/getUnit', UnitListView.as_view()),
+    path('api/getUnitItem', UnitItem.as_view()),
+    path('api/addUnit', UnitCreateView.as_view()),
+    path('api/delUnit', UnitDeleteView.as_view()),
+    path('api/putUnitItem', UnitUpdateView.as_view()),
 ]
