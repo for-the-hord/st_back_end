@@ -16,24 +16,24 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from .view import login, UploadFileView, TemplateListView, TemplateCreateView, TemplateDeleteView, TemplateUpdateView, \
-    TemplateItem, TemplateSearchView, DataListView, DataCreateView, DataUpdateView, DataDeleteView, DataItem, \
-    DataSearchView, UnitListView, UnitItem, UnitCreateView, UnitUpdateView, UnitDeleteView
+    TemplateItem, DataListView, DataCreateView, DataUpdateView, DataDeleteView, DataItem, \
+    UnitListView, UnitItem, UnitCreateView, UnitUpdateView, UnitDeleteView, LoginUnitListView
 
 urlpatterns = [
-    path('api/admin/', admin.site.urls),
+    path('api/getUnitLogin/', LoginUnitListView.as_view()),
     path('api/login', login.as_view()),
     path('api/getFormwork', TemplateListView.as_view()),
     path('api/getFormworkItem', TemplateItem.as_view()),
     path('api/addFormwork', TemplateCreateView.as_view()),
     path('api/delFormwork', TemplateDeleteView.as_view()),
     path('api/putFormworkItem', TemplateUpdateView.as_view()),
-    path('api/searchFormworkItem', TemplateSearchView.as_view()),
+
     path('api/getDataInfo', DataListView.as_view()),
     path('api/getDataInfoItem', DataItem.as_view()),
     path('api/addDataInfo', DataCreateView.as_view()),
     path('api/delDataInfo', DataDeleteView.as_view()),
     path('api/putDataInfoItem', DataUpdateView.as_view()),
-    path('api/searchDataInfoItem', DataSearchView.as_view()),
+
     path('api/file/upload', UploadFileView.as_view()),
     path('api/getUnit', UnitListView.as_view()),
     path('api/getUnitItem', UnitItem.as_view()),
