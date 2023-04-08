@@ -98,7 +98,7 @@ class TemplateListView(ListView):
                              '%Y-%m-%d %H:%M:%S'),
                          'update_date': datetime.fromtimestamp(it.get('update_date')).strftime(
                              '%Y-%m-%d %H:%M:%S')} for it in
-                        rows] if len(rows) != 0 else None
+                        rows]
 
                     # 构造返回数据
                     response_json['data'] = {'records': template_list, 'title': None,
@@ -127,9 +127,9 @@ class TemplateListView(ListView):
                          'user_name': it.get('user_name'), 'is_file': it.get('is_fle'),
                          'create_date': datetime.fromtimestamp(it.get('create_date')).strftime(
                              '%Y-%m-%d %H:%M:%S'),
-                         'update_date': datetime.fromtimestamp(it.get('update_date')).strftime(
+                         'update_date': datetime.fromtimestamp(0 if (re:=it.get('update_date')) is None else re).strftime(
                              '%Y-%m-%d %H:%M:%S')} for it in
-                        rows] if len(rows) != 0 else None
+                        rows]
 
                     # 构造返回数据
                     response_json['data'] = {'records': template_list, 'title': None,
@@ -190,9 +190,9 @@ class TemplateCreateView(CreateView):
             id = create_uuid()
             with connection.cursor() as cur:
                 create_date = datetime.now().timestamp()
-                sql = 'insert into template (id,name,template,is_file,create_date,equipment_name) ' \
-                      'values(%s,%s,%s,%s,%s,%s)'
-                params = [id, name, json.dumps(formwork), is_file, create_date,
+                sql = 'insert into template (id,name,template,is_file,create_date,update_date,equipment_name) ' \
+                      'values(%s,%s,%s,%s,%s,%s,%s)'
+                params = [id, name, json.dumps(formwork), is_file, create_date,create_date,
                           equipment_name]
                 cur.execute(sql, params)
                 connection.commit()
@@ -340,7 +340,7 @@ class DataListView(ListView):
                 data_list = [{'id': it.get('id'), 'name': it.get('name'), 'formwork_name': it.get('template_name'),
                               'user_name': it.get('user_name'), 'is_file': it.get('is_fle'),
                               'unit_name': it.get('unit_name')} for it in
-                             rows] if len(rows) != 0 else None
+                             rows]
 
                 # 构造返回数据
                 response_json['data'] = {'records': data_list, 'title': None,
@@ -456,6 +456,44 @@ class DataDeleteView(DeleteView):
         return JsonResponse(response_json)
 
 
+# 拉取单位列表（同登录）
+@method_decorator(csrf_exempt, name='dispatch')
+class UnitSearchView(DeleteView):
+
+    def post(self, request: HttpRequest):
+        response_json = create_return_json()
+
+        with connection.cursor() as cur:
+            sql = 'select n.id,n.name from  unit n '
+            cur.execute(sql)
+            rows = rows_as_dict(cur)
+            response_json['data'] = rows
+        return JsonResponse(response_json)
+
+
+# 通过单位获取模板
+@method_decorator(csrf_exempt, name='dispatch')
+class TemplateSearchView(DeleteView):
+
+    def post(self, request, *args, **kwargs):
+        response_json = create_return_json()
+        try:
+            j = json.loads(request.body)
+            unit_id = j.get('unit_id')
+            with connection.cursor() as cur:
+                sql = 'select ut.template_id as id,t.name ' \
+                      'from  unit_template ut ' \
+                      'left join template t ' \
+                      'where ut.unit_id=%s'
+                param = [unit_id]
+                cur.execute(sql, param)
+                rows = rows_as_dict(cur)
+                response_json['data'] = rows
+        except Exception as e:
+            response_json['code'], response_json['msg'] = return_msg.S100, return_msg.row_none
+        return JsonResponse(response_json)
+
+
 # 获取所有数据列表接口
 @method_decorator(csrf_exempt, name='dispatch')
 # @method_decorator(check_token, name='dispatch')
@@ -485,8 +523,7 @@ class UnitListView(ListView):
                     rows = rows_as_dict(cur)
                     data_list = [{'id': it.get('id'), 'name': it.get('name'),
                                   'formwork_id': it.get('template_id'), 'formwork_name': it.get('template_name')
-                                  } for it in
-                                 rows] if len(rows) != 0 else None
+                                  } for it in rows]
 
             else:
                 where_clause = " AND ".join([f"{key} LIKE %s" for key in condition.keys()])
@@ -510,8 +547,7 @@ class UnitListView(ListView):
                     data_list = [
                         {'id': it.get('id'), 'name': it.get('name'),
                          'formwork_id': it.get('template_id'), 'formwork_name': it.get('template_name')
-                         } for it in
-                        rows] if len(rows) != 0 else None
+                         } for it in rows]
 
             # 使用 defaultdict 创建新的数据结构
             records = defaultdict(lambda: {"id": None, "name": None, "formwork_list": []})
