@@ -199,8 +199,7 @@ class TemplateCreateView(CreateView):
                 create_date = datetime.now().timestamp()
                 sql = 'insert into template (id,name,template,is_file,create_date,update_date) ' \
                       'values(%s,%s,%s,%s,%s,%s)'
-                params = [id, name, json.dumps(formwork), is_file, create_date, create_date,
-                          equipment_name]
+                params = [id, name, json.dumps(formwork), is_file, create_date, create_date,]
                 cur.execute(sql, params)
                 params = [[id, create_uuid(), it] for it in equipment_name]
                 sql = 'insert into tp_equipment (template_id,equipment_id,equipment_name) values (%s,%s,%s)'
@@ -669,7 +668,7 @@ class UnitCreateView(CreateView):
                 cur.execute(sql, params)
                 sql = 'insert into unit_template (unit_id,template_id) values (%s,%s)'
                 params = [[id, it] for it in template_ids]
-                cur.execute(sql, params)
+                cur.executemany(sql, params)
                 connection.commit()
                 response_json['data'] = {'id': id}
         except Exception as e:
