@@ -724,3 +724,44 @@ class UnitDeleteView(DeleteView):
         except self.model.DoesNotExist:
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_delete
         return JsonResponse(response_json)
+
+# 修改系统名称接口
+@method_decorator(csrf_exempt, name='dispatch')
+class SysInfoUpdateView(UpdateView):
+
+    def post(self, request, *args, **kwargs):
+        response_json = create_return_json()
+        try:
+            j = json.loads(request.body)
+            name = j.get('sys_title')
+            with connection.cursor() as cur:
+                sql = 'update sys_info set sys_title=%s'
+                params = [name]
+                cur.execute(sql, params)
+                connection.commit()
+        except Exception as e:
+            response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_update
+        return JsonResponse(response_json)
+
+# 添加一个管理员用户
+@method_decorator(csrf_exempt, name='dispatch')
+class UserCreateView(CreateView):
+
+    def post(self, request: HttpRequest, *args, **kwargs):
+        response_json = create_return_json()
+        try:
+            j = json.loads(request.body)
+            name = j.get('name')
+            account = j.get('account')
+            password = '123456'
+            id = create_uuid()
+
+            with connection.cursor() as cur:
+                sql = 'insert into user (id, name, password, unit_id, account) values(%s,%s,%s,%s,%s)'
+                params = [id, name,password,None,account]
+                cur.execute(sql, params)
+                connection.commit()
+                response_json['data'] = {'password': '123456'}
+        except Exception as e:
+            response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_insert
+        return JsonResponse(response_json)
