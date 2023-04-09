@@ -229,7 +229,7 @@ class TemplateUpdateView(UpdateView):
             with connection.cursor() as cur:
                 update_date = datetime.now().timestamp()
                 sql = 'update template set name=%s,template=%s,is_file=%s,update_date=%s ' \
-                      'where id=%s)'
+                      'where id=%s'
                 params = [name, json.dumps(formwork), is_file, update_date, id]
                 cur.execute(sql, params)
                 sql = 'delete from tp_equipment where template_id=%s'
@@ -275,8 +275,9 @@ class login(View):
             account = str(get_json.get('account', None)).replace(' ', '')
             password = str(get_json.get('password', None)).replace(' ', '')
             with connection.cursor() as cur:
-                sql = 'select u.id,n.id as unit_id,n.name as unit_name,u.name  ' \
+                sql = 'select u.id,n.id as unit_id,n.name as unit_name,u.name ,s.sys_title ' \
                       'from user u left join unit n on u.unit_id=n.id ' \
+                      'left join sys_info s on 1=1 ' \
                       'where u.account= %s and u.password=%s'
                 params = [account, password]
                 cur.execute(sql, params)
@@ -289,7 +290,8 @@ class login(View):
                                                                         'user_name': user.get('name'),
                                                                         'user_id': user.get('id'),
                                                                         'unit_id': user.get('unit_id'),
-                                                                        'unit_name': user.get('unit_name')}
+                                                                        'unit_name': user.get('unit_name'),
+                                                                        'sys_title':user.get('sys_title')}
             else:
                 response_json['msg'], response_json['code'] = '账户或密码错误！', return_msg.S100
         return JsonResponse(response_json)
@@ -316,7 +318,7 @@ class UploadFileView(View):
         if file:
             filename = default_storage.save(file.name, file)
             id = create_uuid()
-            file = File(id=id, name=filename, path=file_path)
+            file = File(id=id, name=filename, path='./')
             file.save()
             response_json['data'] = {'id': id, 'file_name': filename}
             return JsonResponse(response_json)
@@ -448,7 +450,7 @@ class DataCreateView(CreateView):
             files = j.get('files')
             id = create_uuid()
             with connection.cursor() as cur:
-                sql = 'insert into tp_data (id,name,tp_id,data,files) values(%s,%s,%s,%s,%s)'
+                sql = 'insert into tp_data (id,name,template_id,data,files) values(%s,%s,%s,%s,%s)'
                 params = [id, name, formwork_id, json.dumps(data_info), json.dumps(files)]
                 cur.execute(sql, params)
                 connection.commit()
@@ -471,7 +473,7 @@ class DataUpdateView(UpdateView):
             formwork = j.get('formwork')
             is_file = j.get('is_file')
             with connection.cursor() as cur:
-                sql = 'update template set id=%s,name=%s,template=%s,is_file=%s where id=%s)'
+                sql = 'update template set id=%s,name=%s,template=%s,is_file=%s where id=%s'
                 params = [name, json.dumps(formwork), is_file, id]
                 cur.execute(sql, params)
                 cur.commit()
