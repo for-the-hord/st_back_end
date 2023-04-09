@@ -17,11 +17,14 @@ from django.contrib import admin
 from django.urls import path
 from .view import login, UploadFileView, TemplateListView, TemplateCreateView, TemplateDeleteView, TemplateUpdateView, \
     TemplateItem, DataListView, DataCreateView, DataUpdateView, DataDeleteView, DataItem, \
-    UnitListView, UnitItem, UnitCreateView, UnitUpdateView, UnitDeleteView, LoginUnitListView,UnitSearchView,TemplateSearchView
-
+    UnitListView, UnitItem, UnitCreateView, UnitUpdateView, UnitDeleteView, LoginUnitListView,UnitSearchView,TemplateSearchView,\
+    EquipmentSearchView,SysInfoUpdateView,UserCreateView
 urlpatterns = [
-    path('api/getUnitLogin/', LoginUnitListView.as_view()),
     path('api/login', login.as_view()),
+    path('api/getUnitLogin/', LoginUnitListView.as_view()),
+    path('api/putSysInfo', SysInfoUpdateView.as_view()),
+    path('api/addUser', UserCreateView.as_view()),
+
     path('api/getFormwork', TemplateListView.as_view()),
     path('api/getFormworkItem', TemplateItem.as_view()),
     path('api/addFormwork', TemplateCreateView.as_view()),
@@ -35,6 +38,7 @@ urlpatterns = [
     path('api/putDataInfoItem', DataUpdateView.as_view()),
     path('api/getUnitSearch', UnitSearchView.as_view()),
     path('api/getTemplateSearch', TemplateSearchView.as_view()),
+    path('api/getEquipmentSearch', EquipmentSearchView.as_view()),
 
     path('api/file/upload', UploadFileView.as_view()),
     path('api/getUnit', UnitListView.as_view()),
