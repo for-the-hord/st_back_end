@@ -578,7 +578,8 @@ class UnitListView(ListView):
                       't.id as template_id,t.name as template_name ' \
                       'from unit n ' \
                       'left join unit_template ut on n.id=ut.unit_id ' \
-                      'left join template t on ut.template_id=t.id  ' \
+                      'left join template t on ut.template_id=t.id ' \
+                      'where n.id in () ' \
                       f'{where_clause} ' \
                       'order by t.id limit %s offset %s'
                 params = where_values + [page_size, (page_index - 1) * page_size]
