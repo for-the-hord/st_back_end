@@ -173,7 +173,7 @@ class TemplateItem(DetailView):
                         group["update_date"] = record["update_date"]
                         # 如果 formwork_id 和 formwork_name 不为 None，则加入到 formwork_list 中
                         if record["equipment_id"] is not None and record["equipment_name"] is not None:
-                            group["formwork_list"].append(
+                            group["equipment_list"].append(
                                 {"equipment_id": record["equipment_id"], "equipment_name": record["equipment_name"]})
 
                     # 将字典转换为列表
