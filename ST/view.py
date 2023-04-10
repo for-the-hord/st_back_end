@@ -78,7 +78,8 @@ class TemplateListView(ListView):
             page_index = j.get('page_index')
             condition = j.get('condition', {})
             limit_clause = '' if page_size == 0 and page_index == 0 else 'limit %s offset %s'
-            where_clause ='' if len(condition)==0 else 'where '+ " AND ".join([f"{key} LIKE %s" for key in condition.keys()])
+            where_clause = '' if len(condition) == 0 else 'where ' + " AND ".join(
+                [f"{key} LIKE %s" for key in condition.keys()])
             where_values = ["%" + value + "%" for value in condition.values()]
             with connection.cursor() as cur:
                 params = where_values
@@ -92,7 +93,7 @@ class TemplateListView(ListView):
                       'from template t left join user u on u.id=t.user_id ' \
                       f'{where_clause} ' \
                       f'order by t.id {limit_clause}'
-                params = where_values + [page_size,(page_index - 1) * page_size] \
+                params = where_values + [page_size, (page_index - 1) * page_size] \
                     if limit_clause != '' else where_values
                 cur.execute(sql, params)
                 rows = rows_as_dict(cur)
@@ -199,7 +200,7 @@ class TemplateCreateView(CreateView):
                 create_date = datetime.now().timestamp()
                 sql = 'insert into template (id,name,template,is_file,create_date,update_date) ' \
                       'values(%s,%s,%s,%s,%s,%s)'
-                params = [id, name, json.dumps(formwork), is_file, create_date, create_date,]
+                params = [id, name, json.dumps(formwork), is_file, create_date, create_date, ]
                 cur.execute(sql, params)
                 params = [[id, create_uuid(), it] for it in equipment_name]
                 sql = 'insert into tp_equipment (template_id,equipment_id,equipment_name) values (%s,%s,%s)'
@@ -259,6 +260,12 @@ class TemplateDeleteView(DeleteView):
                 sql = 'delete from template  where id=%s'
                 params = [[it] for it in ids]
                 cur.executemany(sql, params)
+                sql = 'delete from unit_template where template_id=%s'
+                params = [[it] for it in ids]
+                cur.executemany(sql, params)
+                sql = 'delete from tp_equipment where template_id=%s'
+                params = [[it] for it in ids]
+                cur.executemany(sql, params)
                 connection.commit()
         except self.model.DoesNotExist:
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_delete
@@ -290,7 +297,7 @@ class login(View):
                                                                         'user_id': user.get('id'),
                                                                         'unit_id': user.get('unit_id'),
                                                                         'unit_name': user.get('unit_name'),
-                                                                        'sys_title':user.get('sys_title')}
+                                                                        'sys_title': user.get('sys_title')}
             else:
                 response_json['msg'], response_json['code'] = '账户或密码错误！', return_msg.S100
         return JsonResponse(response_json)
@@ -336,31 +343,35 @@ class DataListView(ListView):
             j = json.loads(request.body)
             page_size = j.get('page_size')
             page_index = j.get('page_index')
-            condition = j.get('condition') # {'unit_id':[],'formwork_id','equipment_id':[],'data_info':''}
-            params=[]
-            def dict_to_query_str(d:dict):
-                def convert_key(key):
-                    if key =='unit_id':
-                        key = 'd.unit_id'
-                    elif key == 'formwork_id':
-                        key ='d.template_id'
-                    elif key =='equipment_id':
-                        key ='equipment_id'
-                    return key
+            condition = j.get('condition')  # {'unit_id':[],'formwork_id','equipment_id':[],'data_info':''}
+            params = []
+
+            def dict_to_query_str(d: dict):
+                def convert_key(orginal):
+                    if orginal == 'unit_id':
+                        k = 'd.unit_id'
+                    elif orginal == 'formwork_id':
+                        k = 'd.template_id'
+                    elif orginal == 'equipment_id':
+                        k = 'equipment_id'
+                    else:
+                        k = None
+                    return k
+
                 conditions = []
                 for key, value in d.items():
-
-                    if key =='data_info':
-                        if value:
-                            conditions.append("data_info like  %s ")
-                            params.append(value)
-                    else :
-                        if value:  # 如果数组不为空
-                            conditions.append(f"{convert_key(key)} IN ({','.join(['%s' for i in range(len(value))])})")
-                            params.extend(value)
+                    if k := convert_key(key):
+                        if key == 'data_info':
+                            if value:
+                                conditions.append("data_info like  %s ")
+                                params.append(value)
+                        else:
+                            if value:  # 如果数组不为空
+                                conditions.append(f"{k} IN ({','.join(['%s' for i in range(len(value))])})")
+                                params.extend(value)
                 return ' and '.join(conditions)
-
-            where_clause = '' if len(condition)==0 else 'where '+ dict_to_query_str(condition)
+            where_sql = dict_to_query_str(condition)
+            where_clause = '' if where_sql =='' else 'where ' + dict_to_query_str(condition)
             with connection.cursor() as cur:
                 sql = 'select count(*) as count from tp_data'
                 cur.execute(sql)
@@ -376,10 +387,10 @@ class DataListView(ListView):
                       'left join user u on u.id=d.user_id ' \
                       'left join unit n on n.id=d.unit_id ' \
                       'left join tp_equipment te on t.id = te.template_id ' \
-                     f'{where_clause} ' \
+                      f'{where_clause} ' \
                       'order by t.id ' \
                       'limit %s offset %s'
-                params  += [page_size,(page_index - 1) * page_size]
+                params += [page_size, (page_index - 1) * page_size]
                 cur.execute(sql, params)
                 rows = rows_as_dict(cur)
                 data_list = [{'id': it.get('id'), 'name': it.get('name'), 'formwork_name': it.get('template_name'),
@@ -565,7 +576,8 @@ class UnitListView(ListView):
             page_size = j.get('page_size')
             page_index = j.get('page_index')
             condition = j.get('condition', {})
-            where_clause ='' if len(condition)==0 else 'where '+ " AND ".join([f"{key} LIKE %s" for key in condition.keys()])
+            where_clause = '' if len(condition) == 0 else 'where ' + " AND ".join(
+                [f"{key} LIKE %s" for key in condition.keys()])
             where_values = ["%" + value + "%" for value in condition.values()]
 
             with connection.cursor() as cur:
@@ -574,14 +586,11 @@ class UnitListView(ListView):
                 cur.execute(sql, params)
                 rows = rows_as_dict(cur)
                 count = rows[0]['count']
-                sql = 'select n.id, n.name as unit_name,' \
+                sql = 'select n.id, n.unit_name,' \
                       't.id as template_id,t.name as template_name ' \
-                      'from unit n ' \
+                      f'from (select id,name as unit_name from unit {where_clause} order by id limit %s offset %s) n ' \
                       'left join unit_template ut on n.id=ut.unit_id ' \
-                      'left join template t on ut.template_id=t.id ' \
-                      'where n.id in () ' \
-                      f'{where_clause} ' \
-                      'order by t.id limit %s offset %s'
+                      'left join template t on ut.template_id=t.id '
                 params = where_values + [page_size, (page_index - 1) * page_size]
                 cur.execute(sql, params)
                 rows = rows_as_dict(cur)
@@ -725,6 +734,7 @@ class UnitDeleteView(DeleteView):
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_delete
         return JsonResponse(response_json)
 
+
 # 修改系统名称接口
 @method_decorator(csrf_exempt, name='dispatch')
 class SysInfoUpdateView(UpdateView):
@@ -743,6 +753,7 @@ class SysInfoUpdateView(UpdateView):
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_update
         return JsonResponse(response_json)
 
+
 # 添加一个管理员用户
 @method_decorator(csrf_exempt, name='dispatch')
 class UserCreateView(CreateView):
@@ -758,7 +769,7 @@ class UserCreateView(CreateView):
 
             with connection.cursor() as cur:
                 sql = 'insert into user (id, name, password, unit_id, account) values(%s,%s,%s,%s,%s)'
-                params = [id, name,password,None,account]
+                params = [id, name, password, None, account]
                 cur.execute(sql, params)
                 connection.commit()
                 response_json['data'] = {'password': '123456'}
