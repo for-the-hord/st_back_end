@@ -371,8 +371,7 @@ class DataListView(ListView):
                                 conditions.append(f"{k} IN ({','.join(['%s' for i in range(len(value))])})")
                                 params.extend(value)
                 return ' and '.join(conditions)
-            where_sql = dict_to_query_str(condition)
-            where_clause = '' if where_sql =='' else 'where ' + dict_to_query_str(condition)
+            where_clause = '' if  (where_sql := dict_to_query_str(condition)) =='' else 'where ' + where_sql
             with connection.cursor() as cur:
                 sql = 'select count(*) as count from tp_data'
                 cur.execute(sql)
