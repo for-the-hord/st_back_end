@@ -37,7 +37,7 @@ urlpatterns = [
     path('api/delDataInfo', DataDeleteView.as_view()),
     path('api/putDataInfoItem', DataUpdateView.as_view()),
     path('api/getUnitSearch', UnitSearchView.as_view()),
-    path('api/getTemplateSearch', TemplateSearchView.as_view()),
+    path('api/getFormworkSearch', TemplateSearchView.as_view()),
     path('api/getEquipmentSearch', EquipmentSearchView.as_view()),
 
     path('api/file/upload', UploadFileView.as_view()),

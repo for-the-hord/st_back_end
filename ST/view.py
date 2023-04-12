@@ -539,10 +539,21 @@ class TemplateSearchView(DeleteView):
     def post(self, request, *args, **kwargs):
         response_json = create_return_json()
         try:
+            j = json.loads(request.body)
+
             with connection.cursor() as cur:
-                sql = 'select distinct t.id as id,t.name ' \
-                      'from template t '
-                cur.execute(sql)
+                if j is not None:
+                    unit_id = j.get('unit_id')
+                    params = [unit_id]
+                    sql = 'select distinct t.id as id,t.name ' \
+                          'from template t left join unit_template ut on t.id = ut.template_id ' \
+                          'where ut.unit_id=%s'
+                    cur.execute(sql,params)
+                else:
+                    sql = 'select distinct t.id as id,t.name ' \
+                          'from template t '
+                    cur.execute(sql)
+
                 rows = rows_as_dict(cur)
                 response_json['data'] = rows
         except Exception as e:
@@ -557,11 +568,20 @@ class EquipmentSearchView(DeleteView):
     def post(self, request, *args, **kwargs):
         response_json = create_return_json()
         try:
+            j = json.loads(request.body)
             with connection.cursor() as cur:
-                sql = 'select distinct te.equipment_id as id,' \
-                      'te.equipment_name as name ' \
-                      'from  tp_equipment te '
-                cur.execute(sql)
+                if j is not None:
+                    template_id = j.get('formwork_id')
+                    params = [template_id]
+                    sql = 'select distinct te.equipment_id as id,' \
+                          'te.equipment_name as name ' \
+                          'from  tp_equipment te where te.template_id=%s'
+                    cur.execute(sql,params)
+                else:
+                    sql = 'select distinct te.equipment_id as id,' \
+                          'te.equipment_name as name ' \
+                          'from  tp_equipment te '
+                    cur.execute(sql)
                 rows = rows_as_dict(cur)
                 response_json['data'] = rows
         except Exception as e:
