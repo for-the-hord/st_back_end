@@ -161,7 +161,7 @@ class TemplateItem(DetailView):
                                                    'formwork': None,
                                                    'create_date': 0,
                                                    'update_date': 0,
-                                                   "equipment_list": []})
+                                                   'equipment_list': []})
                     for record in template:
                         # 按照 id 分组，每个分组都是一个字典
                         group = records[record["id"]]
@@ -169,9 +169,10 @@ class TemplateItem(DetailView):
                         group["name"] = record["name"]
                         group["user_name"] = record["user_name"]
                         group["is_file"] = record["is_file"]
+                        group["formwork"] = record["formwork"]
                         group["create_date"] = record["create_date"]
                         group["update_date"] = record["update_date"]
-                        # 如果 formwork_id 和 formwork_name 不为 None，则加入到 formwork_list 中
+                        # 如果 equipment_id 和 equipment_name 不为 None，则加入到 formwork_list 中
                         if record["equipment_id"] is not None and record["equipment_name"] is not None:
                             group["equipment_list"].append(
                                 {"equipment_id": record["equipment_id"], "equipment_name": record["equipment_name"]})
@@ -238,7 +239,7 @@ class TemplateUpdateView(UpdateView):
                 params = [[id, create_uuid(), it] for it in equipment_name]
                 sql = 'insert into tp_equipment (template_id,equipment_id, equipment_name) values (%s,%s,%s)'
                 cur.executemany(sql, params)
-                cur.commit()
+                connection.commit()
             response_json['data'] = {'id': id, 'name': name, 'formwork': formwork, 'is_file': is_file,
                                      'update_date': datetime.fromtimestamp(update_date).strftime('%Y-%m-%d %H:%M:%S'), }
         except Exception as e:
@@ -370,8 +371,7 @@ class DataListView(ListView):
                                 conditions.append(f"{k} IN ({','.join(['%s' for i in range(len(value))])})")
                                 params.extend(value)
                 return ' and '.join(conditions)
-            where_sql = dict_to_query_str(condition)
-            where_clause = '' if where_sql =='' else 'where ' + dict_to_query_str(condition)
+            where_clause = '' if  (where_sql := dict_to_query_str(condition)) =='' else 'where ' + where_sql
             with connection.cursor() as cur:
                 sql = 'select count(*) as count from tp_data'
                 cur.execute(sql)
@@ -486,7 +486,7 @@ class DataUpdateView(UpdateView):
                 sql = 'update template set id=%s,name=%s,template=%s,is_file=%s where id=%s'
                 params = [name, json.dumps(formwork), is_file, id]
                 cur.execute(sql, params)
-                cur.commit()
+                connection.commit()
             response_json['data'] = {'id': id, 'name': name, 'formwork': formwork, 'is_file': is_file}
         except Exception as e:
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_update
