@@ -371,30 +371,36 @@ class DataListView(ListView):
                                 conditions.append(f"{k} IN ({','.join(['%s' for i in range(len(value))])})")
                                 params.extend(value)
                 return ' and '.join(conditions)
-            where_clause = '' if  (where_sql := dict_to_query_str(condition)) =='' else 'where ' + where_sql
+            where_clause = '' if (where_sql := dict_to_query_str(condition)) == '' else 'where ' + where_sql
             with connection.cursor() as cur:
-                sql = 'select count(*) as count from tp_data'
-                cur.execute(sql)
-                rows = rows_as_dict(cur)
-                count = rows[0]['count']
-                sql = 'select d.id,d.name,d.data as data_info,d.unit_id as unit_id,' \
-                      't.id as template_id,t.name as template_name,t.template,t.is_file,' \
-                      'u.name as user_name,' \
-                      'n.name as unit_name,' \
-                      'te.equipment_id ' \
+                sql = 'select count(distinct s.id) as count ' \
+                      'from (select d.id,d.name,d.data as data_info,d.unit_id as unit_id,' \
+                      't.id as template_id,t.name as template_name,' \
+                      'n.name as unit_name,te.equipment_id ' \
                       'from tp_data d ' \
                       'left join template t on t.id=d.template_id ' \
-                      'left join user u on u.id=d.user_id ' \
                       'left join unit n on n.id=d.unit_id ' \
                       'left join tp_equipment te on t.id = te.template_id ' \
                       f'{where_clause} ' \
-                      'order by t.id ' \
+                      'order by t.id ) s '
+                cur.execute(sql)
+                rows = rows_as_dict(cur)
+                count = rows[0]['count']
+                sql = 'select distinct s.id,s.name,s.template_name,s.unit_name ' \
+                      'from (select d.id,d.name,d.data as data_info,d.unit_id as unit_id,' \
+                      't.id as template_id,t.name as template_name,' \
+                      'n.name as unit_name,te.equipment_id ' \
+                      'from tp_data d ' \
+                      'left join template t on t.id=d.template_id ' \
+                      'left join unit n on n.id=d.unit_id ' \
+                      'left join tp_equipment te on t.id = te.template_id ' \
+                      f'{where_clause} ' \
+                      'order by t.id ) s ' \
                       'limit %s offset %s'
                 params += [page_size, (page_index - 1) * page_size]
                 cur.execute(sql, params)
                 rows = rows_as_dict(cur)
                 data_list = [{'id': it.get('id'), 'name': it.get('name'), 'formwork_name': it.get('template_name'),
-                              'user_name': it.get('user_name'), 'is_file': it.get('is_fle'),
                               'unit_name': it.get('unit_name')} for it in
                              rows]
 
