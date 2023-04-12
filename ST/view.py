@@ -350,11 +350,13 @@ class DataListView(ListView):
             def dict_to_query_str(d: dict):
                 def convert_key(orginal):
                     if orginal == 'unit_id':
-                        k = 'd.unit_id'
+                        k = 'n.id'
                     elif orginal == 'formwork_id':
-                        k = 'd.template_id'
+                        k = 't.id'
                     elif orginal == 'equipment_id':
-                        k = 'equipment_id'
+                        k = 'te.equipment_id'
+                    elif orginal =='data_info':
+                        k = 'd.data'
                     else:
                         k = None
                     return k
@@ -364,7 +366,7 @@ class DataListView(ListView):
                     if k := convert_key(key):
                         if key == 'data_info':
                             if value:
-                                conditions.append("data_info like  %s ")
+                                conditions.append(f"{k} like  %s ")
                                 params.append(value)
                         else:
                             if value:  # 如果数组不为空
@@ -373,29 +375,25 @@ class DataListView(ListView):
                 return ' and '.join(conditions)
             where_clause = '' if (where_sql := dict_to_query_str(condition)) == '' else 'where ' + where_sql
             with connection.cursor() as cur:
-                sql = 'select count(distinct s.id) as count ' \
-                      'from (select d.id,d.name,d.data as data_info,d.unit_id as unit_id,' \
-                      't.id as template_id,t.name as template_name,' \
-                      'n.name as unit_name,te.equipment_id ' \
+                sql = 'select count(distinct d.id) as count '\
                       'from tp_data d ' \
                       'left join template t on t.id=d.template_id ' \
                       'left join unit n on n.id=d.unit_id ' \
                       'left join tp_equipment te on t.id = te.template_id ' \
                       f'{where_clause} ' \
-                      'order by t.id ) s '
-                cur.execute(sql)
+                      'order by t.id  '
+                cur.execute(sql, params)
                 rows = rows_as_dict(cur)
                 count = rows[0]['count']
-                sql = 'select distinct s.id,s.name,s.template_name,s.unit_name ' \
-                      'from (select d.id,d.name,d.data as data_info,d.unit_id as unit_id,' \
+                sql = 'select distinct d.id,d.name,d.data as data_info,d.unit_id as unit_id,' \
                       't.id as template_id,t.name as template_name,' \
-                      'n.name as unit_name,te.equipment_id ' \
+                      'n.name as unit_name  ' \
                       'from tp_data d ' \
                       'left join template t on t.id=d.template_id ' \
                       'left join unit n on n.id=d.unit_id ' \
                       'left join tp_equipment te on t.id = te.template_id ' \
                       f'{where_clause} ' \
-                      'order by t.id ) s ' \
+                      'order by t.id ' \
                       'limit %s offset %s'
                 params += [page_size, (page_index - 1) * page_size]
                 cur.execute(sql, params)
