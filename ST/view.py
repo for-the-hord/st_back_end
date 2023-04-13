@@ -344,7 +344,8 @@ class DataListView(ListView):
             j = json.loads(request.body)
             page_size = j.get('page_size')
             page_index = j.get('page_index')
-            condition = j.get('condition')  # {'unit_id':[],'formwork_id','equipment_id':[],'data_info':''}
+            condition = j.get('condition')
+            # {'unit_id':[],'formwork_id','equipment_id':[],'data_info':''}
             params = []
 
             def dict_to_query_str(d: dict):
@@ -355,7 +356,7 @@ class DataListView(ListView):
                         k = 't.id'
                     elif orginal == 'equipment_id':
                         k = 'te.equipment_id'
-                    elif orginal =='data_info':
+                    elif orginal == 'data_info':
                         k = 'd.data'
                     else:
                         k = None
@@ -373,13 +374,14 @@ class DataListView(ListView):
                                 conditions.append(f"{k} IN ({','.join(['%s' for i in range(len(value))])})")
                                 params.extend(value)
                 return ' and '.join(conditions)
+
             where_clause = '' if (where_sql := dict_to_query_str(condition)) == '' else 'where ' + where_sql
             with connection.cursor() as cur:
-                sql = 'select count(distinct d.id) as count '\
+                sql = 'select count(distinct d.id) as count ' \
                       'from tp_data d ' \
                       'left join template t on t.id=d.template_id ' \
                       'left join unit n on n.id=d.unit_id ' \
-                      'left join tp_equipment te on t.id = te.template_id ' \
+                      'left join tp_equipment te on t.id = te.template_id and te.equipment_id=d.equipment_id ' \
                       f'{where_clause} ' \
                       'order by t.id  '
                 cur.execute(sql, params)
@@ -391,7 +393,7 @@ class DataListView(ListView):
                       'from tp_data d ' \
                       'left join template t on t.id=d.template_id ' \
                       'left join unit n on n.id=d.unit_id ' \
-                      'left join tp_equipment te on t.id = te.template_id ' \
+                      'left join tp_equipment te on t.id = te.template_id and te.equipment_id=d.equipment_id ' \
                       f'{where_clause} ' \
                       'order by t.id ' \
                       'limit %s offset %s'
@@ -427,6 +429,7 @@ class DataItem(DetailView):
                       'left join template t on d.template_id=t.id ' \
                       'left join unit n on n.id=d.unit_id ' \
                       'left join user u on u.id=d.user_id ' \
+                      'left join tp_equipment te on d.equipment_id = te.equipment_id and d.template_id=te.template_id ' \
                       'where d.id=%s'
                 params = [j.get('id')]
                 cur.execute(sql, params)
@@ -462,13 +465,19 @@ class DataCreateView(CreateView):
             formwork_id = j.get('formwork_id')
             data_info = j.get('data_info')
             files = j.get('files')
+            equipment_id = j.get('equipment_id')
+            unit_id = j.get('unit_id')
             id = create_uuid()
             with connection.cursor() as cur:
-                sql = 'insert into tp_data (id,name,template_id,data,files) values(%s,%s,%s,%s,%s)'
-                params = [id, name, formwork_id, json.dumps(data_info), json.dumps(files)]
+                create_date = datetime.now().timestamp()
+                sql = 'insert into tp_data (id,name,template_id,data,files,unit_id,equipment_id,create_date,update_date) ' \
+                      'values(%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+                params = [id, name, formwork_id, json.dumps(data_info), json.dumps(files), unit_id, equipment_id,
+                          create_date,create_date]
                 cur.execute(sql, params)
                 connection.commit()
-            response_json['data'] = {'id': id, 'name': name, 'data_info': data_info, 'files': files}
+            response_json['data'] = {'id': id, 'name': name, 'data_info': data_info, 'files': files, 'unit_id': unit_id,
+                                     'equipment_id': equipment_id}
         except Exception as e:
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_insert
         return JsonResponse(response_json)
@@ -484,14 +493,17 @@ class DataUpdateView(UpdateView):
             j = json.loads(request.body)
             id = j.get('id')
             name = j.get('name')
-            formwork = j.get('formwork')
-            is_file = j.get('is_file')
+            data_info = j.get('data_info')
+            files = j.get('files')
+            equipment_id = j.get('equipemnt_id')
+
             with connection.cursor() as cur:
-                sql = 'update template set id=%s,name=%s,template=%s,is_file=%s where id=%s'
-                params = [name, json.dumps(formwork), is_file, id]
+                create_date = datetime.now().timestamp()
+                sql = 'update tp_data set name=%s,data=%s,files=%s,equipment_id=%s,update_date=%s where id=%s'
+                params = [name, json.dumps(data_info), json.dumps(files),equipment_id, create_date,id]
                 cur.execute(sql, params)
                 connection.commit()
-            response_json['data'] = {'id': id, 'name': name, 'formwork': formwork, 'is_file': is_file}
+
         except Exception as e:
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_update
         return JsonResponse(response_json)
@@ -542,13 +554,13 @@ class TemplateSearchView(DeleteView):
             j = json.loads(request.body)
 
             with connection.cursor() as cur:
-                if j is not None:
+                if 'unit_id' in j:
                     unit_id = j.get('unit_id')
                     params = [unit_id]
                     sql = 'select distinct t.id as id,t.name ' \
                           'from template t left join unit_template ut on t.id = ut.template_id ' \
                           'where ut.unit_id=%s'
-                    cur.execute(sql,params)
+                    cur.execute(sql, params)
                 else:
                     sql = 'select distinct t.id as id,t.name ' \
                           'from template t '
@@ -570,13 +582,13 @@ class EquipmentSearchView(DeleteView):
         try:
             j = json.loads(request.body)
             with connection.cursor() as cur:
-                if j is not None:
+                if 'formwork_id' in j:
                     template_id = j.get('formwork_id')
                     params = [template_id]
                     sql = 'select distinct te.equipment_id as id,' \
                           'te.equipment_name as name ' \
                           'from  tp_equipment te where te.template_id=%s'
-                    cur.execute(sql,params)
+                    cur.execute(sql, params)
                 else:
                     sql = 'select distinct te.equipment_id as id,' \
                           'te.equipment_name as name ' \
