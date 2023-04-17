@@ -128,7 +128,6 @@ class TemplateItem(DetailView):
                       't.create_date as create_date,' \
                       't.update_date as update_date,' \
                       'u.name as user_name,' \
-                      'te.equipment_id,' \
                       'te.equipment_name ' \
                       'from template t ' \
                       'left join user u on u.id=t.user_id ' \
@@ -146,7 +145,6 @@ class TemplateItem(DetailView):
                                  'user_name': it.get('user_name'),
                                  'is_file': it.get('is_file'),
                                  'formwork': it.get('template'),
-                                 'equipment_id': it.get('equipment_id'),
                                  'equipment_name': it.get('equipment_name'),
                                  'create_date': datetime.fromtimestamp(it.get('create_date')).strftime(
                                      '%Y-%m-%d %H:%M:%S'),
@@ -173,9 +171,9 @@ class TemplateItem(DetailView):
                         group["create_date"] = record["create_date"]
                         group["update_date"] = record["update_date"]
                         # 如果 equipment_id 和 equipment_name 不为 None，则加入到 formwork_list 中
-                        if record["equipment_id"] is not None and record["equipment_name"] is not None:
+                        if record["equipment_name"] is not None:
                             group["equipment_list"].append(
-                                {"equipment_id": record["equipment_id"], "equipment_name": record["equipment_name"]})
+                                {"equipment_name": record["equipment_name"]})
 
                     # 将字典转换为列表
                     records = list(records.values())
@@ -198,18 +196,24 @@ class TemplateCreateView(CreateView):
             equipment_name = j.get('equipment_name')
             id = create_uuid()
             with connection.cursor() as cur:
-                create_date = datetime.now().timestamp()
-                sql = 'insert into template (id,name,template,is_file,create_date,update_date) ' \
-                      'values(%s,%s,%s,%s,%s,%s)'
-                params = [id, name, json.dumps(formwork), is_file, create_date, create_date, ]
-                cur.execute(sql, params)
-                params = [[id, create_uuid(), it] for it in equipment_name]
-                sql = 'insert into tp_equipment (template_id,equipment_id,equipment_name) values (%s,%s,%s)'
-                cur.executemany(sql, params)
-                connection.commit()
-            response_json['data'] = {'id': id, 'name': name, 'formwork': formwork, 'is_file': is_file,
-                                     'create_date': datetime.fromtimestamp(create_date).strftime('%Y-%m-%d %H:%M:%S'),
-                                     'equipment_name': equipment_name}
+                sql = 'select count(*) as count from template t where t.name=%s'
+                params=[name]
+                cur.execute(sql,params)
+                rows = rows_as_dict(cur)
+                count = rows[0]['count']
+                if count==1:
+                    response_json['code'],response_json['msg']=return_msg.S100,return_msg.exist_template
+                else:
+                    create_date = datetime.now().timestamp()
+                    sql = 'insert into template (id,name,template,is_file,create_date,update_date) ' \
+                          'values(%s,%s,%s,%s,%s,%s)'
+                    params = [id, name, json.dumps(formwork), is_file, create_date, create_date, ]
+                    cur.execute(sql, params)
+                    params = [[id, it] for it in equipment_name]
+                    sql = 'insert into tp_equipment (template_id,equipment_name) values (%s,%s)'
+                    cur.executemany(sql, params)
+                    connection.commit()
+
         except Exception as e:
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_insert
         return JsonResponse(response_json)
@@ -228,20 +232,26 @@ class TemplateUpdateView(UpdateView):
             is_file = j.get('is_file')
             equipment_name = j.get('equipment_name')
             with connection.cursor() as cur:
-                update_date = datetime.now().timestamp()
-                sql = 'update template set name=%s,template=%s,is_file=%s,update_date=%s ' \
-                      'where id=%s'
-                params = [name, json.dumps(formwork), is_file, update_date, id]
-                cur.execute(sql, params)
-                sql = 'delete from tp_equipment where template_id=%s'
-                params = [id]
-                cur.execute(sql, params)
-                params = [[id, create_uuid(), it] for it in equipment_name]
-                sql = 'insert into tp_equipment (template_id,equipment_id, equipment_name) values (%s,%s,%s)'
-                cur.executemany(sql, params)
-                connection.commit()
-            response_json['data'] = {'id': id, 'name': name, 'formwork': formwork, 'is_file': is_file,
-                                     'update_date': datetime.fromtimestamp(update_date).strftime('%Y-%m-%d %H:%M:%S'), }
+                sql = 'select count(*) as count from template t where t.name=%s and t.id!=%s'
+                params=[name,id]
+                cur.execute(sql,params)
+                rows = rows_as_dict(cur)
+                count = rows[0]['count']
+                if count==1:
+                    response_json['code'],response_json['msg']=return_msg.S100,return_msg.exist_template
+                else:
+                    update_date = datetime.now().timestamp()
+                    sql = 'update template set name=%s,template=%s,is_file=%s,update_date=%s ' \
+                          'where id=%s'
+                    params = [name, json.dumps(formwork), is_file, update_date, id]
+                    cur.execute(sql, params)
+                    sql = 'delete from tp_equipment where template_id=%s'
+                    params = [id]
+                    cur.execute(sql, params)
+                    params = [[id, it] for it in equipment_name]
+                    sql = 'insert into tp_equipment (template_id, equipment_name) values (%s,%s)'
+                    cur.executemany(sql, params)
+                    connection.commit()
         except Exception as e:
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_update
         return JsonResponse(response_json)
@@ -345,7 +355,7 @@ class DataListView(ListView):
             page_size = j.get('page_size')
             page_index = j.get('page_index')
             condition = j.get('condition')
-            # {'unit_id':[],'formwork_id','equipment_id':[],'data_info':''}
+            # {'unit_id':[],'formwork_id','equipment_name':[],'data_info':''}
             params = []
 
             def dict_to_query_str(d: dict):
@@ -354,8 +364,8 @@ class DataListView(ListView):
                         k = 'n.id'
                     elif orginal == 'formwork_id':
                         k = 't.id'
-                    elif orginal == 'equipment_id':
-                        k = 'te.equipment_id'
+                    elif orginal == 'equipment_name':
+                        k = 'te.equipment_name'
                     elif orginal == 'data_info':
                         k = 'd.data'
                     else:
@@ -381,7 +391,7 @@ class DataListView(ListView):
                       'from tp_data d ' \
                       'left join template t on t.id=d.template_id ' \
                       'left join unit n on n.id=d.unit_id ' \
-                      'left join tp_equipment te on t.id = te.template_id and te.equipment_id=d.equipment_id ' \
+                      'left join tp_equipment te on t.id = te.template_id and te.equipment_name=d.equipment_name ' \
                       f'{where_clause} ' \
                       'order by t.id  '
                 cur.execute(sql, params)
@@ -393,7 +403,8 @@ class DataListView(ListView):
                       'from tp_data d ' \
                       'left join template t on t.id=d.template_id ' \
                       'left join unit n on n.id=d.unit_id ' \
-                      'left join tp_equipment te on t.id = te.template_id and te.equipment_id=d.equipment_id ' \
+                      'left join tp_equipment te ' \
+                      'on t.id = te.template_id and te.equipment_name=d.equipment_name ' \
                       f'{where_clause} ' \
                       'order by t.id ' \
                       'limit %s offset %s'
@@ -424,12 +435,14 @@ class DataItem(DetailView):
                 sql = 'select d.id,d.name,d.data,d.files,d.create_date,d.update_date,' \
                       't.is_file,t.name as template_name,' \
                       'n.name as unit_name,' \
-                      'u.name as user_name ' \
+                      'u.name as user_name,' \
+                      'te.equipment_name ' \
                       'from tp_data d ' \
                       'left join template t on d.template_id=t.id ' \
                       'left join unit n on n.id=d.unit_id ' \
                       'left join user u on u.id=d.user_id ' \
-                      'left join tp_equipment te on d.equipment_id = te.equipment_id and d.template_id=te.template_id ' \
+                      'left join tp_equipment te ' \
+                      'on d.equipment_name = te.equipment_name and d.template_id=te.template_id ' \
                       'where d.id=%s'
                 params = [j.get('id')]
                 cur.execute(sql, params)
@@ -443,6 +456,7 @@ class DataItem(DetailView):
                                              'is_file': rows[0].get('is_file'),
                                              'data_info': rows[0].get('data'),
                                              'files': json.loads(rows[0].get('files')),
+                                             'equipment_name':rows[0]['equipment_name'],
                                              'unit_name': rows[0].get('unit_name'),
                                              'user_name': rows[0].get('user_name'),
                                              'create_date': rows[0].get('create_date'),
@@ -465,19 +479,17 @@ class DataCreateView(CreateView):
             formwork_id = j.get('formwork_id')
             data_info = j.get('data_info')
             files = j.get('files')
-            equipment_id = j.get('equipment_id')
+            equipment_name = j.get('equipment_name')
             unit_id = j.get('unit_id')
             id = create_uuid()
             with connection.cursor() as cur:
                 create_date = datetime.now().timestamp()
-                sql = 'insert into tp_data (id,name,template_id,data,files,unit_id,equipment_id,create_date,update_date) ' \
+                sql = 'insert into tp_data (id,name,template_id,data,files,unit_id,equipment_name,create_date,update_date) ' \
                       'values(%s,%s,%s,%s,%s,%s,%s,%s,%s)'
-                params = [id, name, formwork_id, json.dumps(data_info), json.dumps(files), unit_id, equipment_id,
+                params = [id, name, formwork_id, json.dumps(data_info), json.dumps(files), unit_id, equipment_name,
                           create_date,create_date]
                 cur.execute(sql, params)
                 connection.commit()
-            response_json['data'] = {'id': id, 'name': name, 'data_info': data_info, 'files': files, 'unit_id': unit_id,
-                                     'equipment_id': equipment_id}
         except Exception as e:
             response_json['code'], response_json['msg'] = return_msg.S100, return_msg.fail_insert
         return JsonResponse(response_json)
@@ -495,12 +507,12 @@ class DataUpdateView(UpdateView):
             name = j.get('name')
             data_info = j.get('data_info')
             files = j.get('files')
-            equipment_id = j.get('equipemnt_id')
+            equipment_name = j.get('equipemnt_name')
 
             with connection.cursor() as cur:
                 create_date = datetime.now().timestamp()
-                sql = 'update tp_data set name=%s,data=%s,files=%s,equipment_id=%s,update_date=%s where id=%s'
-                params = [name, json.dumps(data_info), json.dumps(files),equipment_id, create_date,id]
+                sql = 'update tp_data set name=%s,data=%s,files=%s,equipment_name=%s,update_date=%s where id=%s'
+                params = [name, json.dumps(data_info), json.dumps(files),equipment_name, create_date,id]
                 cur.execute(sql, params)
                 connection.commit()
 
@@ -585,12 +597,11 @@ class EquipmentSearchView(DeleteView):
                 if 'formwork_id' in j:
                     template_id = j.get('formwork_id')
                     params = [template_id]
-                    sql = 'select distinct te.equipment_id as id,' \
-                          'te.equipment_name as name ' \
+                    sql = 'select distinct te.equipment_name as name ' \
                           'from  tp_equipment te where te.template_id=%s'
                     cur.execute(sql, params)
                 else:
-                    sql = 'select distinct te.equipment_id as id,' \
+                    sql = 'select distinct te.equipment_name as name,' \
                           'te.equipment_name as name ' \
                           'from  tp_equipment te '
                     cur.execute(sql)
