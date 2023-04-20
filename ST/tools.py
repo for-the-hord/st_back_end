@@ -22,6 +22,8 @@ class MSG:
     token_expired ='token已过期'
     no_user = '用户不存在'
     exist = '已存在该名称的代码！'
+    exist_template = '已存在重复的模板名称！'
+    exist_equipment = '已存在重复的装备名称！'
     exist_some = '存在相同指标'
     unaccess = '无权限访问'
     timeout = '验证码已过期！'

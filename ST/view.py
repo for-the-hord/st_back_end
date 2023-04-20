@@ -316,6 +316,7 @@ class login(View):
 
 # 获取单位列表
 class LoginUnitListView(View):
+
     def post(self, request: HttpRequest):
         response_json = create_return_json()
         with connection.cursor() as cur:
@@ -339,7 +340,7 @@ class loginWithout(View):
         return JsonResponse(response_json)
 
 
-# 上传接口g
+# 上传接口
 class UploadFileView(View):
     def post(self, request, *args, **kwargs):
         response_json = create_return_json()
