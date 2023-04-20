@@ -18,12 +18,14 @@ from django.urls import path
 from .view import login, UploadFileView, TemplateListView, TemplateCreateView, TemplateDeleteView, TemplateUpdateView, \
     TemplateItem, DataListView, DataCreateView, DataUpdateView, DataDeleteView, DataItem, \
     UnitListView, UnitItem, UnitCreateView, UnitUpdateView, UnitDeleteView, LoginUnitListView,UnitSearchView,TemplateSearchView,\
-    EquipmentSearchView,SysInfoUpdateView,UserCreateView
+    EquipmentSearchView,SysInfoUpdateView,UserCreateView,loginWithout
 urlpatterns = [
     path('api/login', login.as_view()),
-    path('api/getUnitLogin/', LoginUnitListView.as_view()),
+    path('api/getUnitLogin', LoginUnitListView.as_view()),
+    path('api/user/login', loginWithout.as_view()),
     path('api/putSysInfo', SysInfoUpdateView.as_view()),
     path('api/addUser', UserCreateView.as_view()),
+    path('api/upload', UploadFileView.as_view()),
 
     path('api/getFormwork', TemplateListView.as_view()),
     path('api/getFormworkItem', TemplateItem.as_view()),
